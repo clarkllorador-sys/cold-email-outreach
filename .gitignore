@@ -1,0 +1,18 @@
+# Credentials — never commit
+.env
+credentials/
+*.json.key
+
+# Generated outputs
+inputs/raw_leads.json
+inputs/ig_reach_history.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
