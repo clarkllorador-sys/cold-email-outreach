@@ -38,7 +38,7 @@ Sends personalised cold emails with the video thumbnail embedded. Reads from the
 
 ```
 cold-email-outreach/
-├── extract_leads.py            ← Step 1: Playwright + Bright Data scraper
+├── extract_leads.py            ← Step 1: Playwright + Bright Data scraper (available on request)
 ├── generate_audio.py           ← Step 2: ElevenLabs TTS + Whisper STT
 ├── generate_videos.py          ← Step 3: Loom + FFmpeg compositor
 ├── send_emails.py              ← Step 4a: Gmail API (single account)
