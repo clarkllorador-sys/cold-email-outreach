@@ -67,25 +67,11 @@ Google Sheets acts as the CRM throughout — each step reads from and writes bac
 
 ---
 
-## Quick start (test mode)
+## Running it
+
+Each script is independently runnable with `--dry-run` and `--limit` flags for safe testing. See `.env.example` for required credentials.
 
 ```bash
-# 1. Install dependencies
-pip install playwright playwright-stealth requests beautifulsoup4 \
-    gspread google-auth google-api-python-client openai-whisper \
-    python-dotenv elevenlabs
-
-# 2. Install Playwright browsers
-playwright install chromium
-
-# 3. Install Bright Data CLI (required for Step 1 and Step 3)
-sudo npm install -g @brightdata/cli && bdata login
-
-# 4. Generate sample leads for testing
-python generate_dummy_leads.py
-# → inputs/sample_leads.csv  (import into Google Sheets)
-
-# 5. Dry-run a single step
 python extract_leads.py --no-gsheets --limit 3 --cities London
 python generate_audio.py --dry-run
 python generate_videos.py --dry-run
@@ -94,32 +80,16 @@ python send_emails_multi_acct.py --dry-run
 
 ---
 
-## Production setup
+## Engineering highlights
 
-1. Copy `.env.example` to `.env` and fill in all credentials
-2. Set up Google Sheets: share the spreadsheet with your service account email
-3. Upload your headshot recording (green screen) to Loom, named `TEMPLATE`
-4. Upload your template audio ("I'm Alex...") to Google Drive — set `TEMPLATE_DRIVE_FILE_ID` in `.env`
-5. Run the full pipeline:
-   ```bash
-   python extract_leads.py --cities London Birmingham Manchester
-   python generate_audio.py
-   python generate_videos.py
-   python send_emails_multi_acct.py --limit 15
-   ```
+- **Bot protection bypass** — OpenTable's detail pages are protected by Akamai. The scraper uses a hybrid approach: Playwright for listing pages, Bright Data's residential proxy network for detail pages that would otherwise block headless browsers.
 
----
+- **Structured data extraction** — Rather than brittle CSS selectors, the scraper parses structured JSON embedded in each listing page, making it resilient to frontend markup changes.
 
-## Key implementation notes
+- **Audio quality assurance** — ElevenLabs TTS is verified by a local Whisper STT pass before any audio is accepted. Mispronounced business names are automatically flagged and retried rather than silently sent.
 
-**Bright Data for OpenTable** — OpenTable UK uses Akamai bot protection which blocks headless Playwright. The solution: Playwright loads the search/listing pages (no bot protection), then `bdata scrape` fetches each detail page through Bright Data's residential proxy network, which bypasses Akamai cleanly.
+- **Video compositing** — FFmpeg handles a three-stream composite: personalised name audio, host headshot video (green screen keyed out), and website screenshot as background. Volume is normalised across all sources.
 
-**`__INITIAL_STATE__` JSON blob** — OpenTable embeds all restaurant data in a `<script id="primary-window-vars">` tag as a JSON blob. Parsing this directly is far more reliable than CSS selectors, which break on markup changes.
+- **Credential-free Drive uploads** — Uses OAuth rather than a service account for Google Drive to avoid the 15 GB per-account upload quota that would otherwise cap throughput at scale.
 
-**Whisper STT verification** — ElevenLabs occasionally mispronounces unusual business names. Whisper transcribes the generated audio and `names_match()` uses normalisation + difflib ratio ≥ 0.75 to confirm the name was said correctly before marking `audio_verified=TRUE`.
-
-**FFmpeg pipeline** — Three-input composite: `(1)` name MP3 (ElevenLabs), `(2)` Loom headshot video, `(3)` host template audio. `loudnorm` filter balances volume between TTS and recorded audio. `-shortest` stops encoding when the Loom video ends.
-
-**Drive OAuth vs service account** — Google Drive has a 15 GB upload quota per service account. Using OAuth credentials (same token as Gmail) avoids this limit entirely.
-
-**SMTP warm-up** — Daily limit defaults to 15 emails across 3 sender accounts (5 each) to avoid spam classification during domain warm-up. Round-robin assignment keeps each account's volume low.
+- **Multi-account sending** — Emails are round-robined across multiple SMTP accounts with a configurable daily cap per run, designed for gradual domain warm-up.
